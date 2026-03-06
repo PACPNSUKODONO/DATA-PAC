@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUSAT DATA PAC PAGAR NUSA SUKODONO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        :root { --primary: #003d3d; --accent: #10b981; --hover-bg: #005c5c; --sidebar-width: 260px; --bg-content: #f8fafc; }
+        * { margin: 0; padding: 0; box-sizing: border-box; text-transform: uppercase; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-content); display: flex; min-height: 100vh; }
+        
+        .sidebar { width: var(--sidebar-width); background: var(--primary); color: white; position: fixed; height: 100vh; z-index: 1000; overflow-y: auto; }
+        .sidebar-user { padding: 20px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; letter-spacing: 1px; }
+        .nav-item { padding: 15px 20px; display: flex; align-items: center; color: rgba(255,255,255,0.8); cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; font-size: 0.8rem; }
+        .nav-item:hover, .nav-item.active { background: var(--hover-bg); color: white; border-left-color: var(--accent); }
+        .nav-item i { width: 25px; margin-right: 10px; }
+
+        .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 30px; width: calc(100% - var(--sidebar-width)); }
+        .page-section { display: none; }
+        .page-section.active { display: block; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid var(--accent); }
+        .stat-card h3 { font-size: 0.65rem; color: #64748b; }
+        .stat-card p { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+
+        .finance-summary { border-bottom-color: #3b82f6; }
+
+        .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .chart-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
+        .chart-card h3 { font-size: 0.75rem; margin-bottom: 15px; color: var(--primary); }
+
+        .form-container, .table-wrapper { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .input-group { display: flex; flex-direction: column; position: relative; }
+        label { font-size: 0.65rem; margin-bottom: 5px; color: #64748b; font-weight: 600; }
+        input, select { padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8rem; outline: none; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #f8fafc; padding: 12px; text-align: left; font-size: 0.7rem; color: #64748b; border-bottom: 2px solid #edf2f7; cursor: pointer; }
+        th i { margin-left: 5px; font-size: 0.6rem; opacity: 0.5; }
+        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 0.75rem; }
+
+        .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; z-index: 100; max-height: 150px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .suggestion-item { padding: 8px; cursor: pointer; font-size: 0.75rem; border-bottom: 1px solid #eee; }
+        .suggestion-item:hover { background: #f0f0f0; }
+
+        .btn-action { border: none; background: none; cursor: pointer; font-size: 1rem; margin: 0 5px; }
+        .btn-edit { color: #3b82f6; } .btn-delete { color: #ef4444; } .btn-download { color: #10b981; }
+        .btn-print { padding: 8px 15px; border-radius: 6px; border: none; color: white; cursor: pointer; font-size: 0.7rem; font-weight: 600; margin-right: 5px; }
+
+        .db-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .search-box { flex: 1; min-width: 250px; position: relative; }
+        .search-box input { width: 100%; padding-left: 35px; }
+        .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; }
+        
+        .slider-container { display: flex; align-items: center; gap: 15px; background: white; padding: 5px 15px; border-radius: 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .slider-container label { margin-bottom: 0; white-space: nowrap; }
+        input[type="range"] { accent-color: var(--accent); cursor: pointer; }
+
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; position: relative; }
+        .modal-content img { width: 150px; height: 150px; border-radius: 10px; object-fit: cover; margin-bottom: 15px; border: 3px solid var(--primary); }
+        .modal-content h2 { color: var(--primary); margin-bottom: 10px; }
+        .modal-content p { font-size: 0.85rem; margin: 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .finance-table-footer th { background: #f1f5f9; font-weight: 700; color: var(--primary); }
+
+        @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar span, .sidebar-user { display: none; } .main-content { margin-left: 60px; width: calc(100% - 60px); } }
+    </style>
+</head>
+<body>
+
+<div id="memberModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <img id="modal-img" src="" alt="FOTO">
+        <h2 id="modal-nama"></h2>
+        <p><strong>RANTING:</strong> <span id="modal-ranting"></span></p>
+        <p><strong>KUALIFIKASI:</strong> <span id="modal-kualifikasi"></span></p>
+        <p><strong>PELATIH:</strong> <span id="modal-pelatih"></span></p>
+        <p><strong>DESA:</strong> <span id="modal-desa"></span></p>
+    </div>
+</div>
+
+<div class="sidebar">
+    <div class="sidebar-user">PUSAT DATA PAC PAGAR NUSA SUKODONO</div>
+    <div class="nav-menu">
+        <div class="nav-item active" onclick="switchPage('dashboard', this)"><i class="fas fa-home"></i><span>Dashboard</span></div>
+        <div class="nav-item" onclick="switchPage('input', this)"><i class="fas fa-user-plus"></i><span>Input Anggota</span></div>
+        <div class="nav-item" onclick="switchPage('database', this)"><i class="fas fa-users"></i><span>Database</span></div>
+        <div class="nav-item" onclick="switchPage('surat-masuk', this)"><i class="fas fa-envelope-open-text"></i><span>Surat Masuk</span></div>
+        <div class="nav-item" onclick="switchPage('surat-keluar', this)"><i class="fas fa-paper-plane"></i><span>Surat Keluar</span></div>
+        <div class="nav-item" onclick="switchPage('keuangan', this)"><i class="fas fa-wallet"></i><span>Keuangan</span></div>
+    </div>
+</div>
+
+<div class="main-content">
+    <section id="page-dashboard" class="page-section active">
+        <h1>Dashboard Statistik</h1>
+        <div class="stats-grid">
+            <div class="stat-card"><h3>Total Anggota</h3><p id="stat-total">0</p></div>
+            <div class="stat-card"><h3>Total Ranting</h3><p id="stat-ranting">0</p></div>
+            <div class="stat-card"><h3>Total Pelatih</h3><p id="stat-pelatih">0</p></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card finance-summary"><h3>Total Pemasukan</h3><p id="stat-in" style="color:#10b981">Rp 0</p></div>
+            <div class="stat-card finance-summary"><h3>Total Pengeluaran</h3><p id="stat-out" style="color:#ef4444">Rp 0</p></div>
+            <div class="stat-card finance-summary"><h3>Total Kas (Saldo)</h3><p id="stat-balance" style="color:#3b82f6">Rp 0</p></div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card"><h3>Gender (Putra & Putri)</h3><canvas id="chartGender"></canvas></div>
+            <div class="chart-card"><h3>Kualifikasi Usia</h3><canvas id="chartAge"></canvas></div>
+            <div class="chart-card"><h3>Ranting</h3><canvas id="chartRanting"></canvas></div>
+            <div class="chart-card"><h3>Dokumen Surat</h3><canvas id="chartSurat"></canvas></div>
+        </div>
+    </section>
+
+    <section id="page-input" class="page-section">
+        <h2 id="form-title">Input Data Anggota</h2>
+        <div class="form-container">
+            <input type="hidden" id="in-id">
+            <div class="form-grid">
+                <div class="input-group"><label>Nama Lengkap</label><input type="text" id="in-nama"></div>
+                <div class="input-group"><label>Tempat Lahir</label><input type="text" id="in-kota" autocomplete="off" placeholder="Ketik nama kabupaten..."><div id="kota-sug" class="suggestions" style="display:none"></div></div>
+                <div class="input-group"><label>Tanggal Lahir</label><input type="date" id="in-tgl" onchange="autoFillKualifikasi()"></div>
+                <div class="input-group"><label>Kualifikasi Usia (Otomatis)</label><input type="text" id="in-kualifikasi" readonly style="background: #f1f5f9; font-weight: bold;"></div>
+                <div class="input-group"><label>Alamat</label><input type="text" id="in-alamat"></div>
+                <div class="input-group"><label>Jenis Kelamin</label><select id="in-jk"><option value="PUTRA">PUTRA</option><option value="PUTRI">PUTRI</option></select></div>
+                <div class="input-group"><label>Ranting</label><input type="text" id="in-ranting"></div>
+                <div class="input-group"><label>Desa Latihan</label><input type="text" id="in-desa" autocomplete="off" placeholder="Ketik nama desa..."><div id="desa-sug" class="suggestions" style="display:none"></div></div>
+                <div class="input-group"><label>Pelatih</label><input type="text" id="in-pelatih"></div>
+                <div class="input-group"><label>Foto</label><input type="file" id="in-foto" onchange="handleFile(this, 'foto')"></div>
+            </div>
+            <button onclick="saveMember()" id="btn-save-member" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:15px; cursor:pointer">SIMPAN DATA</button>
+            <button onclick="cancelEdit()" id="btn-cancel-edit" style="width:100%; padding:12px; background:#64748b; color:white; border:none; border-radius:8px; margin-top:5px; cursor:pointer; display:none;">BATAL EDIT</button>
+        </div>
+    </section>
+
+    <section id="page-database" class="page-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+            <h2>Database Anggota</h2>
+            <div>
+                <button class="btn-print" style="background:#27ae60" onclick="exportMemberExcel()"><i class="fas fa-file-excel"></i> EXCEL</button>
+                <button class="btn-print" style="background:#e74c3c" onclick="exportMemberPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+            </div>
+        </div>
+        <div class="db-controls">
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" id="db-search" placeholder="Cari Nama, Ranting, atau Kualifikasi..." oninput="renderMembers()"></div>
+            <div class="slider-container"><label>Tampilkan: <b id="val-entries">10</b></label><input type="range" id="db-limit" min="10" max="50" step="20" value="10" list="steplist" oninput="updateLimitLabel(this.value)"><datalist id="steplist"><option value="10"></option><option value="30"></option><option value="50"></option></datalist></div>
+        </div>
+        <div class="table-wrapper" style="overflow-x:auto">
+            <table><thead><tr><th onclick="sortTable('nama')">NAMA <i class="fas fa-sort"></i></th><th>TEMPAT LAHIR</th><th>TGL LAHIR</th><th>ALAMAT</th><th>JK</th><th onclick="sortTable('ranting')">RANTING <i class="fas fa-sort"></i></th><th>DESA LATIHAN</th><th>PELATIH</th><th>AKSI</th></tr></thead><tbody id="table-member-body"></tbody></table>
+        </div>
+    </section>
+
+    <section id="page-surat-masuk" class="page-section">
+        <h2>Surat Masuk</h2>
+        <div class="form-container">
+            <input type="hidden" id="sm-id">
+            <div class="form-grid">
+                <div class="input-group"><label>Nomor Surat</label><input type="text" id="sm-no"></div>
+                <div class="input-group"><label>Tanggal</label><input type="date" id="sm-tgl"></div>
+                <div class="input-group"><label>Pengirim</label><input type="text" id="sm-pengirim"></div>
+                <div class="input-group"><label>Perihal</label><input type="text" id="sm-hal"></div>
+                <div class="input-group"><label>Upload File</label><input type="file" id="sm-file" onchange="handleFile(this, 'surat')"></div>
+            </div>
+            <button id="btn-save-sm" onclick="saveSurat('masuk')" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:10px; cursor:pointer">SIMPAN SURAT MASUK</button>
+            <button id="btn-cancel-sm" onclick="clearSuratForm('masuk')" style="display:none; width:100%; padding:10px; background:#64748b; color:white; border:none; border-radius:8px; margin-top:5px; cursor:pointer">BATAL</button>
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>NO</th><th>NOMOR</th><th>TGL</th><th>PENGIRIM</th><th>PERIHAL</th><th>AKSI</th></tr></thead><tbody id="sm-body"></tbody></table>
+        </div>
+    </section>
+
+    <section id="page-surat-keluar" class="page-section">
+        <h2>Surat Keluar</h2>
+        <div class="form-container">
+            <input type="hidden" id="sk-id">
+            <div class="form-grid">
+                <div class="input-group"><label>Nomor Surat</label><input type="text" id="sk-no"></div>
+                <div class="input-group"><label>Tanggal</label><input type="date" id="sk-tgl"></div>
+                <div class="input-group"><label>Penerima</label><input type="text" id="sk-penerima"></div>
+                <div class="input-group"><label>Perihal</label><input type="text" id="sk-hal"></div>
+                <div class="input-group"><label>Upload File</label><input type="file" id="sk-file" onchange="handleFile(this, 'surat')"></div>
+            </div>
+            <button id="btn-save-sk" onclick="saveSurat('keluar')" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:10px; cursor:pointer">SIMPAN SURAT KELUAR</button>
+            <button id="btn-cancel-sk" onclick="clearSuratForm('keluar')" style="display:none; width:100%; padding:10px; background:#64748b; color:white; border:none; border-radius:8px; margin-top:5px; cursor:pointer">BATAL</button>
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>NO</th><th>NOMOR</th><th>TGL</th><th>PENERIMA</th><th>PERIHAL</th><th>AKSI</th></tr></thead><tbody id="sk-body"></tbody></table>
+        </div>
+    </section>
+
+    <section id="page-keuangan" class="page-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+            <h2>Manajemen Keuangan</h2>
+            <div><button class="btn-print" style="background:#27ae60" onclick="exportFinanceExcel()"><i class="fas fa-file-excel"></i> EXCEL</button><button class="btn-print" style="background:#2980b9" onclick="exportFinanceWord()"><i class="fas fa-file-word"></i> WORD</button></div>
+        </div>
+        <div class="form-container">
+            <input type="hidden" id="f-id">
+            <h3 id="f-form-title" style="font-size: 0.8rem; margin-bottom: 15px; color: var(--primary);">Tambah Transaksi Baru</h3>
+            <div class="form-grid">
+                <div class="input-group"><label>Jenis</label><select id="f-tipe"><option value="masuk">PEMASUKAN (+)</option><option value="keluar">PENGELUARAN (-)</option></select></div>
+                <div class="input-group"><label>Tanggal</label><input type="date" id="f-tgl"></div>
+                <div class="input-group"><label>Keterangan</label><input type="text" id="f-ket"></div>
+                <div class="input-group"><label>Nominal (Rp)</label><input type="number" id="f-nom"></div>
+            </div>
+            <button id="btn-save-fin" onclick="saveFinance()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:15px; cursor:pointer">SIMPAN TRANSAKSI</button>
+            <button id="btn-cancel-fin" onclick="clearFinanceForm()" style="display:none; width:100%; padding:10px; background:#64748b; color:white; border:none; border-radius:8px; margin-top:5px; cursor:pointer">BATAL EDIT</button>
+        </div>
+        <div class="table-wrapper">
+            <h3>Rekap Transaksi Keuangan</h3>
+            <table id="table-keuangan">
+                <thead>
+                    <tr>
+                        <th>NO</th>
+                        <th>TANGGAL</th>
+                        <th>KETERANGAN</th>
+                        <th>PEMASUKAN (+)</th>
+                        <th>PENGELUARAN (-)</th>
+                        <th>TOTAL SALDO</th>
+                        <th>AKSI</th>
+                    </tr>
+                </thead>
+                <tbody id="f-body"></tbody>
+                <tfoot class="finance-table-footer">
+                    <tr>
+                        <th colspan="3" style="text-align:right">TOTAL KAS AKHIR:</th>
+                        <th id="footer-total-in">Rp 0</th>
+                        <th id="footer-total-out">Rp 0</th>
+                        <th id="footer-total-balance">Rp 0</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+</div>
+
+
+
+<script>
+    // KONFIGURASI FIREBASE
+    const firebaseConfig = {
+        apiKey: "AIzaSyD3z0GvZodNWzN3ZhKjJzztFyvBvjzg_Ak",
+        authDomain: "data-pac-pagar-nusa-sukodono.firebaseapp.com",
+        databaseURL: "https://data-pac-pagar-nusa-sukodono-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "data-pac-pagar-nusa-sukodono",
+        storageBucket: "data-pac-pagar-nusa-sukodono.firebasestorage.app",
+        messagingSenderId: "624326200024",
+        appId: "1:624326200024:web:10d1ee6122d527f91aa5ad"
+    };
+    
+    // Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Referensi Database
+    const dbRefMembers = db.ref('members');
+    const dbRefSuratM = db.ref('surat_masuk');
+    const dbRefSuratK = db.ref('surat_keluar');
+    const dbRefFinance = db.ref('finance');
+
+    let dbMembers = [];
+    let dbSuratM = [];
+    let dbSuratK = [];
+    let dbFinance = [];
+    let tempFile = "";
+    let charts = {};
+    let sortOrder = { nama: 1, kualifikasi: 1, ranting: 1 };
+
+    const listKota = ["SIDOARJO", "SURABAYA", "GRESIK", "MOJOKERTO", "JOMBANG", "MALANG", "PASURUAN", "SAMPANG", "SUMENEP", "PAMEKASAN", "BANGKALAN", "JAKARTA", "BANDUNG", "SEMARANG", "KEDIRI", "MADIUN", "TUBAN", "BOJONEGORO", "LAMONGAN", "BANYUWANGI", "JEMBER", "BLITAR"];
+    const listDesa = ["SAIMBANG", "ANGGASWANGI", "WILAYUT", "PEKARUNGAN", "PADEMONEGORO", "SUKODONO", "SURUH", "JUMPUTREJO", "DUNGUS", "PANJUNAN", "SUKO", "KLOPOSEPULUH", "MASANGAN WETAN", "MASANGAN KULON", "CANGKRINGSARI", "SAMBUNGREJO", "NGARESREJO", "BANGSRI", "PLUMBUNGAN", "JOGOSATRU"];
+
+    // Fungsi Sinkronisasi Real-time
+    dbRefMembers.on('value', snap => { dbMembers = snap.val() || []; renderMembers(); initDashboard(); });
+    dbRefSuratM.on('value', snap => { dbSuratM = snap.val() || []; renderSurat('masuk'); initDashboard(); });
+    dbRefSuratK.on('value', snap => { dbSuratK = snap.val() || []; renderSurat('keluar'); initDashboard(); });
+    dbRefFinance.on('value', snap => { dbFinance = snap.val() || []; renderFinance(); initDashboard(); });
+
+    function getKualifikasi(tglLahir) {
+        if(!tglLahir) return "-";
+        const age = new Date().getFullYear() - new Date(tglLahir).getFullYear();
+        if(age <= 10) return "USIA DINI";
+        if(age <= 13) return "PRA REMAJA";
+        if(age <= 17) return "REMAJA";
+        return "DEWASA";
+    }
+
+    function autoFillKualifikasi() {
+        const tgl = document.getElementById('in-tgl').value;
+        document.getElementById('in-kualifikasi').value = getKualifikasi(tgl);
+    }
+
+    function updateLimitLabel(val) {
+        let displayVal = val == 30 ? 25 : val;
+        document.getElementById('val-entries').innerText = displayVal;
+        renderMembers();
+    }
+
+    function setupAutocomplete(inputId, suggestionId, dataList) {
+        const input = document.getElementById(inputId);
+        const suggestionBox = document.getElementById(suggestionId);
+        input.oninput = function() {
+            const val = this.value.toUpperCase();
+            suggestionBox.innerHTML = "";
+            if(!val) { suggestionBox.style.display="none"; return; }
+            const filtered = dataList.filter(item => item.startsWith(val));
+            filtered.forEach(item => {
+                const d = document.createElement('div');
+                d.className = "suggestion-item";
+                d.innerText = item;
+                d.onclick = () => { input.value = item; suggestionBox.style.display="none"; };
+                suggestionBox.appendChild(d);
+            });
+            suggestionBox.style.display = filtered.length ? "block" : "none";
+        };
+        document.addEventListener('click', (e) => { if(e.target !== input) suggestionBox.style.display = "none"; });
+    }
+
+    function switchPage(page, el) {
+        document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        document.getElementById('page-' + page).classList.add('active');
+        el.classList.add('active');
+        if(page === 'dashboard') initDashboard();
+        if(page === 'database') renderMembers();
+        if(page.startsWith('surat')) renderSurat(page === 'surat-masuk' ? 'masuk' : 'keluar');
+        if(page === 'keuangan') renderFinance();
+    }
+
+    function sortTable(key) {
+        sortOrder[key] *= -1;
+        dbMembers.sort((a, b) => (a[key] || "").localeCompare(b[key] || "") * sortOrder[key]);
+        renderMembers();
+    }
+
+    function openModal(i) {
+        const m = dbMembers[i];
+        document.getElementById('modal-img').src = m.foto || 'https://via.placeholder.com/150';
+        document.getElementById('modal-nama').innerText = m.nama;
+        document.getElementById('modal-ranting').innerText = m.ranting;
+        document.getElementById('modal-kualifikasi').innerText = getKualifikasi(m.tgl);
+        document.getElementById('modal-pelatih').innerText = m.pelatih || '-';
+        document.getElementById('modal-desa').innerText = m.desa || '-';
+        document.getElementById('memberModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('memberModal').style.display = 'none'; }
+
+    function renderMembers() {
+        const b = document.getElementById('table-member-body');
+        const searchInput = document.getElementById('db-search');
+        const search = searchInput ? searchInput.value.toUpperCase() : "";
+        let limit = parseInt(document.getElementById('db-limit').value);
+        if(limit == 30) limit = 25;
+        b.innerHTML = "";
+        let filtered = dbMembers.filter(m => m && (m.nama.includes(search) || m.ranting.includes(search)));
+        filtered.slice(0, limit).forEach((m, i) => {
+            const originalIndex = dbMembers.indexOf(m);
+            b.innerHTML += `<tr>
+                <td onclick="openModal(${originalIndex})" style="color:var(--primary); font-weight:600; cursor:pointer">${m.nama} <i class="fas fa-search" style="font-size:0.6rem"></i></td>
+                <td>${m.kota}</td><td>${m.tgl}</td><td>${m.alamat}</td><td>${m.jk}</td><td>${m.ranting}</td><td>${m.desa || '-'}</td><td>${m.pelatih || '-'}</td>
+                <td><button onclick="editMember(${originalIndex})" class="btn-action btn-edit"><i class="fas fa-edit"></i></button><button onclick="deleteData('member', ${originalIndex})" class="btn-action btn-delete"><i class="fas fa-trash"></i></button></td>
+            </tr>`;
+        });
+    }
+
+    function saveMember() {
+        const id = document.getElementById('in-id').value;
+        const data = {
+            nama: document.getElementById('in-nama').value.toUpperCase(),
+            kota: document.getElementById('in-kota').value.toUpperCase(),
+            tgl: document.getElementById('in-tgl').value,
+            alamat: document.getElementById('in-alamat').value.toUpperCase(),
+            jk: document.getElementById('in-jk').value,
+            ranting: document.getElementById('in-ranting').value.toUpperCase(),
+            desa: document.getElementById('in-desa').value.toUpperCase(),
+            pelatih: document.getElementById('in-pelatih').value.toUpperCase(),
+            foto: tempFile
+        };
+        if(!data.nama || !data.ranting) return alert("NAMA DAN RANTING WAJIB DIISI");
+        
+        if(id !== "") dbMembers[id] = data; else dbMembers.push(data);
+        dbRefMembers.set(dbMembers); // Simpan ke Firebase
+        
+        cancelEdit();
+        switchPage('database', document.querySelector('.nav-item:nth-child(3)'));
+    }
+
+    function editMember(i) {
+        const m = dbMembers[i];
+        document.getElementById('in-id').value = i;
+        document.getElementById('in-nama').value = m.nama;
+        document.getElementById('in-kota').value = m.kota;
+        document.getElementById('in-tgl').value = m.tgl;
+        document.getElementById('in-alamat').value = m.alamat;
+        document.getElementById('in-jk').value = m.jk;
+        document.getElementById('in-ranting').value = m.ranting;
+        document.getElementById('in-desa').value = m.desa;
+        document.getElementById('in-pelatih').value = m.pelatih;
+        tempFile = m.foto;
+        autoFillKualifikasi();
+        document.getElementById('form-title').innerText = "Edit Data Anggota";
+        document.getElementById('btn-save-member').innerText = "UPDATE DATA";
+        document.getElementById('btn-cancel-edit').style.display = "block";
+        switchPage('input', document.querySelector('.nav-item:nth-child(2)'));
+    }
+
+    function cancelEdit() {
+        document.getElementById('in-id').value = "";
+        document.getElementById('form-title').innerText = "Input Data Anggota";
+        document.getElementById('btn-save-member').innerText = "SIMPAN DATA";
+        document.getElementById('btn-cancel-edit').style.display = "none";
+        document.querySelectorAll('#page-input input').forEach(inp => inp.value = "");
+        tempFile = "";
+    }
+
+    function exportMemberExcel() {
+        const ws = XLSX.utils.json_to_sheet(dbMembers);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Anggota");
+        XLSX.writeFile(wb, "DATABASE_PAGAR_NUSA.xlsx");
+    }
+
+    function exportMemberPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        doc.text("DATABASE ANGGOTA PAGAR NUSA SUKODONO", 14, 15);
+        const head = [["NAMA", "TTL", "ALAMAT", "JK", "RANTING", "DESA", "PELATIH"]];
+        const body = dbMembers.map(m => [m.nama, `${m.kota}, ${m.tgl}`, m.alamat, m.jk, m.ranting, m.desa, m.pelatih]);
+        doc.autoTable({ head: head, body: body, startY: 20, theme: 'grid' });
+        doc.save("DATABASE_PAGAR_NUSA.pdf");
+    }
+
+    function initDashboard() {
+        const uniqueRantings = [...new Set(dbMembers.map(m => m.ranting).filter(r => r))];
+        const uniquePelatihs = [...new Set(dbMembers.map(m => m.pelatih).filter(p => p))];
+        document.getElementById('stat-total').innerText = dbMembers.length;
+        document.getElementById('stat-ranting').innerText = uniqueRantings.length;
+        document.getElementById('stat-pelatih').innerText = uniquePelatihs.length;
+        
+        let totalIn = 0, totalOut = 0;
+        dbFinance.forEach(f => { if(f.tipe === 'masuk') totalIn += f.nom; else totalOut += f.nom; });
+        document.getElementById('stat-in').innerText = "Rp " + totalIn.toLocaleString();
+        document.getElementById('stat-out').innerText = "Rp " + totalOut.toLocaleString();
+        document.getElementById('stat-balance').innerText = "Rp " + (totalIn - totalOut).toLocaleString();
+        
+        drawPieChart('chartGender', ['PUTRA', 'PUTRI'], [dbMembers.filter(m => m.jk === 'PUTRA').length, dbMembers.filter(m => m.jk === 'PUTRI').length], ['#3b82f6', '#ec4899']);
+        
+        const ageMap = {"USIA DINI":0, "PRA REMAJA":0, "REMAJA":0, "DEWASA":0};
+        dbMembers.forEach(m => { const kual = getKualifikasi(m.tgl); if(ageMap[kual] !== undefined) ageMap[kual]++; });
+        drawPieChart('chartAge', Object.keys(ageMap), Object.values(ageMap), ['#f59e0b', '#8b5cf6', '#3b82f6', '#10b981']);
+        
+        const rantingCount = {};
+        dbMembers.forEach(m => { if(m.ranting) rantingCount[m.ranting] = (rantingCount[m.ranting] || 0) + 1; });
+        drawPieChart('chartRanting', Object.keys(rantingCount), Object.values(rantingCount), '#10b981');
+        
+        drawPieChart('chartSurat', ['SURAT MASUK', 'SURAT KELUAR'], [dbSuratM.length, dbSuratK.length], ['#f97316', '#06b6d4']);
+    }
+
+    function drawPieChart(id, labels, data, colors) {
+        if(charts[id]) charts[id].destroy();
+        const ctx = document.getElementById(id); if(!ctx) return;
+        charts[id] = new Chart(ctx, {
+            type: 'pie',
+            data: { labels: labels, datasets: [{ data: data, backgroundColor: Array.isArray(colors) ? colors : '#10b981' }] },
+            options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 9 } } } } }
+        });
+    }
+
+    function handleFile(input, type) {
+        const reader = new FileReader();
+        reader.onload = (e) => tempFile = e.target.result;
+        if(input.files[0]) reader.readAsDataURL(input.files[0]);
+    }
+
+    function renderSurat(type) {
+        const data = type === 'masuk' ? dbSuratM : dbSuratK;
+        const prefix = type === 'masuk' ? 'sm' : 'sk';
+        const b = document.getElementById(`${prefix}-body`);
+        if(!b) return;
+        b.innerHTML = "";
+        data.forEach((s, i) => {
+            if(!s) return;
+            const btnDown = s.file ? `<button onclick="downloadFile('${s.file}', 'SURAT_${s.no}')" class="btn-action btn-download" title="Download"><i class="fas fa-download"></i></button>` : `<button class="btn-action" style="opacity:0.2" disabled><i class="fas fa-download"></i></button>`;
+            const entitas = type === 'masuk' ? (s.pengirim || '-') : (s.penerima || '-');
+            b.innerHTML += `<tr>
+                <td>${i+1}</td><td>${s.no}</td><td>${s.tgl}</td><td>${entitas}</td><td>${s.hal}</td>
+                <td>
+                    ${btnDown}
+                    <button onclick="editSurat('${type}', ${i})" class="btn-action btn-edit" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteData('surat-${type}', ${i})" class="btn-action btn-delete" title="Hapus"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    function saveSurat(type) {
+        const prefix = type === 'masuk' ? 'sm' : 'sk';
+        const id = document.getElementById(`${prefix}-id`).value;
+        const data = { no: document.getElementById(`${prefix}-no`).value.toUpperCase(), tgl: document.getElementById(`${prefix}-tgl`).value, hal: document.getElementById(`${prefix}-hal`).value.toUpperCase(), file: tempFile };
+        if(type === 'masuk') data.pengirim = document.getElementById('sm-pengirim').value.toUpperCase();
+        else data.penerima = document.getElementById('sk-penerima').value.toUpperCase();
+        
+        let targetDb = type === 'masuk' ? dbSuratM : dbSuratK;
+        if(id !== "") {
+            if(!tempFile) data.file = targetDb[id].file;
+            targetDb[id] = data;
+        } else {
+            targetDb.push(data);
+        }
+
+        if(type === 'masuk') dbRefSuratM.set(dbSuratM); else dbRefSuratK.set(dbSuratK);
+        clearSuratForm(type);
+        alert("DATA SURAT BERHASIL DISIMPAN!");
+    }
+
+    function editSurat(type, i) {
+        const prefix = type === 'masuk' ? 'sm' : 'sk';
+        const s = type === 'masuk' ? dbSuratM[i] : dbSuratK[i];
+        document.getElementById(`${prefix}-id`).value = i;
+        document.getElementById(`${prefix}-no`).value = s.no;
+        document.getElementById(`${prefix}-tgl`).value = s.tgl;
+        document.getElementById(`${prefix}-hal`).value = s.hal;
+        if(type === 'masuk') document.getElementById('sm-pengirim').value = s.pengirim;
+        else document.getElementById('sk-penerima').value = s.penerima;
+        
+        document.getElementById(`btn-save-${prefix}`).innerText = "UPDATE SURAT";
+        document.getElementById(`btn-cancel-${prefix}`).style.display = "block";
+        tempFile = s.file;
+    }
+
+    function clearSuratForm(type) {
+        const prefix = type === 'masuk' ? 'sm' : 'sk';
+        document.getElementById(`${prefix}-id`).value = "";
+        const inputs = document.querySelectorAll(`#page-surat-${type} input`);
+        if(inputs) inputs.forEach(inp => inp.value = "");
+        document.getElementById(`btn-save-${prefix}`).innerText = `SIMPAN SURAT ${type.toUpperCase()}`;
+        document.getElementById(`btn-cancel-${prefix}`).style.display = "none";
+        tempFile = "";
+    }
+
+    function deleteData(type, i) {
+        if(!confirm("APAKAH ANDA YAKIN INGIN MENGHAPUS DATA INI?")) return;
+        if(type === 'member') {
+            dbMembers.splice(i, 1);
+            dbRefMembers.set(dbMembers);
+        } else if(type === 'surat-masuk') {
+            dbSuratM.splice(i, 1);
+            dbRefSuratM.set(dbSuratM);
+        } else if(type === 'surat-keluar') {
+            dbSuratK.splice(i, 1);
+            dbRefSuratK.set(dbSuratK);
+        } else if(type === 'fin') {
+            dbFinance.splice(i, 1);
+            dbRefFinance.set(dbFinance);
+        }
+    }
+
+    function downloadFile(base64, name) {
+        const link = document.createElement('a');
+        link.href = base64;
+        link.download = name;
+        link.click();
+    }
+
+    function renderFinance() {
+        const b = document.getElementById('f-body');
+        if(!b) return;
+        b.innerHTML = "";
+        let runningBalance = 0, totalIn = 0, totalOut = 0;
+        dbFinance.forEach((f, i) => {
+            if(!f) return;
+            const m = f.tipe === 'masuk' ? f.nom : 0;
+            const k = f.tipe === 'keluar' ? f.nom : 0;
+            totalIn += m; totalOut += k;
+            runningBalance += (m - k);
+            b.innerHTML += `<tr>
+                <td>${i+1}</td><td>${f.tgl}</td><td>${f.ket}</td>
+                <td style="color:#10b981">${m ? 'Rp '+m.toLocaleString() : '-'}</td>
+                <td style="color:#ef4444">${k ? 'Rp '+k.toLocaleString() : '-'}</td>
+                <td style="font-weight:600">Rp ${runningBalance.toLocaleString()}</td>
+                <td><button onclick="editFinance(${i})" class="btn-action btn-edit"><i class="fas fa-edit"></i></button><button onclick="deleteData('fin', ${i})" class="btn-action btn-delete"><i class="fas fa-trash"></i></button></td>
+            </tr>`;
+        });
+        document.getElementById('footer-total-in').innerText = "Rp " + totalIn.toLocaleString();
+        document.getElementById('footer-total-out').innerText = "Rp " + totalOut.toLocaleString();
+        document.getElementById('footer-total-balance').innerText = "Rp " + runningBalance.toLocaleString();
+    }
+
+    function saveFinance() {
+        const id = document.getElementById('f-id').value;
+        const data = { tipe: document.getElementById('f-tipe').value, tgl: document.getElementById('f-tgl').value, ket: document.getElementById('f-ket').value.toUpperCase(), nom: parseInt(document.getElementById('f-nom').value) || 0 };
+        if(!data.tgl || !data.ket || data.nom <= 0) return alert("LENGKAPI DATA TRANSAKSI!");
+        
+        if(id !== "") dbFinance[id] = data; else dbFinance.push(data);
+        dbRefFinance.set(dbFinance);
+        clearFinanceForm();
+    }
+
+    function editFinance(i) {
+        const f = dbFinance[i];
+        document.getElementById('f-id').value = i;
+        document.getElementById('f-tipe').value = f.tipe;
+        document.getElementById('f-tgl').value = f.tgl;
+        document.getElementById('f-ket').value = f.ket;
+        document.getElementById('f-nom').value = f.nom;
+        document.getElementById('f-form-title').innerText = "Edit Transaksi";
+        document.getElementById('btn-save-fin').innerText = "UPDATE TRANSAKSI";
+        document.getElementById('btn-cancel-fin').style.display = "block";
+    }
+
+    function clearFinanceForm() {
+        document.getElementById('f-id').value = "";
+        document.querySelectorAll('#page-keuangan input').forEach(inp => inp.value = "");
+        document.getElementById('f-form-title').innerText = "Tambah Transaksi Baru";
+        document.getElementById('btn-save-fin').innerText = "SIMPAN TRANSAKSI";
+        document.getElementById('btn-cancel-fin').style.display = "none";
+    }
+
+    function exportFinanceExcel() {
+        const ws = XLSX.utils.json_to_sheet(dbFinance);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Keuangan");
+        XLSX.writeFile(wb, "LAPORAN_KEUANGAN_PAC.xlsx");
+    }
+
+    function exportFinanceWord() {
+        alert("FITUR WORD SEDANG DALAM PENGEMBANGAN. GUNAKAN EXCEL UNTUK SEMENTARA.");
+    }
+
+    setupAutocomplete('in-kota', 'kota-sug', listKota);
+    setupAutocomplete('in-desa', 'desa-sug', listDesa);
+    window.onload = () => { initDashboard(); };
+</script>
+</body>
+</html>
